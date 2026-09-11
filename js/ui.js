@@ -1,0 +1,15 @@
+export class UI {
+  constructor(game) {
+    this.game = game;
+    this.levelValue = document.querySelector('#levelValue'); this.levelName = document.querySelector('#levelName'); this.keysValue = document.querySelector('#keysValue'); this.attemptsValue = document.querySelector('#attemptsValue'); this.pips = document.querySelector('#attemptPips').children; this.checkpointValue = document.querySelector('#checkpointValue'); this.checkpointName = document.querySelector('#checkpointName'); this.accuracyValue = document.querySelector('#accuracyValue'); this.accuracyBar = document.querySelector('#accuracyBar'); this.movesValue = document.querySelector('#movesValue'); this.status = document.querySelector('#statusText'); this.shell = document.querySelector('.playfield-wrap');
+    this.startPanel = document.querySelector('#startPanel'); this.pausePanel = document.querySelector('#pausePanel'); this.messagePanel = document.querySelector('#messagePanel'); this.messageKicker = document.querySelector('#messageKicker'); this.messageTitle = document.querySelector('#messageTitle'); this.messageBody = document.querySelector('#messageBody'); this.messageAction = document.querySelector('#messageAction');
+    document.querySelector('#startButton').addEventListener('click', () => game.start()); document.querySelector('#continueButton').addEventListener('click', () => game.togglePause(false)); document.querySelector('#restartButton').addEventListener('click', () => game.restartLevel()); document.querySelector('#soundButton').addEventListener('click', event => { const enabled = game.audio.toggle(); event.currentTarget.textContent = enabled ? 'SOUND ON' : 'SOUND OFF'; }); this.messageAction.addEventListener('click', () => game.messageAction());
+  }
+  sync(state) { this.levelValue.textContent = `${state.level} / 5`; this.levelName.textContent = state.levelName; this.keysValue.textContent = state.keys; this.attemptsValue.textContent = state.attempts; this.checkpointValue.textContent = state.checkpoint ? 'ACTIVE' : 'NONE'; this.checkpointName.textContent = state.checkpointName; this.accuracyValue.textContent = `${state.accuracy}%`; this.accuracyBar.style.width = `${state.accuracy}%`; this.movesValue.textContent = `${state.moves} / ${state.targetMoves}`; [...this.pips].forEach((pip, index) => pip.classList.toggle('off', index >= state.attempts)); this.status.textContent = state.status; }
+  hideStart() { this.startPanel.hidden = true; }
+  pause(show) { this.pausePanel.hidden = !show; }
+  glitch() { this.shell.classList.remove('control-glitch'); void this.shell.offsetWidth; this.shell.classList.add('control-glitch'); }
+  shake() { this.shell.classList.remove('shake'); void this.shell.offsetWidth; this.shell.classList.add('shake'); }
+  message(kicker, title, body, action) { this.messageKicker.textContent = kicker; this.messageTitle.textContent = title; this.messageBody.textContent = body; this.messageAction.textContent = `${action}  Enter`; this.messagePanel.hidden = false; }
+  hideMessage() { this.messagePanel.hidden = true; }
+}
