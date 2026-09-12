@@ -324,13 +324,13 @@ unpredictable-game/
 
 Add screenshots to a `screenshots/` folder and update these links before submission:
 
-![Start screen](screenshots/startscreen.png")
+![Start screen](screenshots/startscreen.png)
 *The start screen introduces the psychological escape trial.*
 
-![Gameplay](screenshots/gameplay.png")
+![Gameplay](screenshots/gameplay.png)
 *Gameplay view showing the maze, player, key, exit, and HUD.*
 
-![End Screen](screenshots/endscreen.png")
+![End Screen](screenshots/endscreen.png)
 *A screen which pops up on clearing a level.*
 
 ## Diagrams
