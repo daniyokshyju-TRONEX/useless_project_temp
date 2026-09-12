@@ -1,1 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#080c14">
+  <title>UNPREDICTABLE // The Maze That Learns</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="game-shell" id="gameShell">
+    <header class="topbar">
+      <div class="brand-lockup">
+        <span class="brand-mark">//</span>
+        <span>UNPREDICTABLE</span>
+        <small>PSYCHOLOGICAL LABYRINTH</small>
+      </div>
+      <div class="status-line">
+        <span class="signal-dot"></span>
+        <span id="statusText">SIGNAL STABLE</span>
+      </div>
+    </header>
 
+    <section class="playfield-wrap">
+      <canvas id="gameCanvas" aria-label="Playable top-down maze"></canvas>
+      <div class="scanlines"></div>
+      <div class="glitch-flash" id="glitchFlash"></div>
+
+      <!-- Start Panel -->
+      <div class="start-panel panel" id="startPanel">
+        <p class="eyebrow">PSYCHOLOGICAL ESCAPE TRIAL</p>
+        <h1>UNPREDICTABLE</h1>
+        <p class="intro">The maze looks simple. But your keyboard controls are themselves the trap.</p>
+        <button class="button button-primary" id="startButton">START GAME <span>↵ Enter</span></button>
+        <p class="fine-print">ARROW KEYS OR WASD &bull; DISCOVER THE SECRET PATTERNS &bull; ESCAPE</p>
+      </div>
+
+      <!-- Pause Panel -->
+      <div class="pause-panel panel" id="pausePanel" hidden>
+        <p class="eyebrow">TRANSMISSION PAUSED</p>
+        <h2>Stay still.<br><em>Think again.</em></h2>
+        <p class="intro">The maze waits for your next hesitation.</p>
+        <button class="button button-primary" id="continueButton">CONTINUE <span>↵ Enter</span></button>
+      </div>
+
+      <!-- Message Panel (Game Over, Level Complete, Victory) -->
+      <div class="message-panel panel" id="messagePanel" hidden>
+        <p class="eyebrow" id="messageKicker">SIGNAL LOST</p>
+        <h2 id="messageTitle">THE MAZE WON.</h2>
+        <p id="messageBody">Your keystrokes were predicted before you pressed them.</p>
+        <button class="button button-primary" id="messageAction">TRY AGAIN <span>↵ Enter</span></button>
+      </div>
+
+      <div class="fail-overlay" id="failOverlay" hidden>
+        <div class="fail-panel">
+          <p class="eyebrow">FAIL STATE</p>
+          <h2>patathe panikku pono</h2>
+          <button class="button button-primary" id="failAction">onnu koode sremikkam</button>
+        </div>
+
+        <div class="gif-stage" id="gifStage" hidden>
+          <div class="rainbow-background" aria-hidden="true"></div>
+          <img id="failGif" src="gif.top" alt="Fail animation" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Professional HUD -->
+    <section class="hud">
+      <div class="hud-block">
+        <span class="hud-label">LEVEL</span>
+        <strong id="levelValue">1 / 5</strong>
+        <span class="level-name" id="levelName">FIRST IMPRESSION</span>
+      </div>
+      <div class="hud-block">
+        <span class="hud-label">KEYS</span>
+        <strong id="keysValue">0</strong>
+        <span class="level-name">COLLECTED</span>
+      </div>
+      <div class="hud-block attempts-block">
+        <span class="hud-label">ATTEMPTS</span>
+        <strong id="attemptsValue">3</strong>
+        <span class="attempt-pips" id="attemptPips"><i></i><i></i><i></i></span>
+      </div>
+      <div class="hud-block checkpoint-block">
+        <span class="hud-label">CHECKPOINT</span>
+        <strong id="checkpointValue">ORIGIN</strong>
+        <span class="level-name" id="checkpointName">START</span>
+      </div>
+      <div class="hud-block accuracy-block" id="accuracyBlock">
+        <span class="hud-label">ACCURACY</span>
+        <strong id="accuracyValue">100%</strong>
+        <span class="accuracy-bar"><i id="accuracyBar" style="width: 100%;"></i></span>
+        <span class="level-name" id="accuracyStatus">OPTIMAL</span>
+      </div>
+      <div class="legend">
+        <span><i class="legend-swatch player-swatch"></i>YOU</span>
+        <span><i class="legend-swatch key-swatch"></i>KEY</span>
+        <span><i class="legend-swatch exit-swatch"></i>EXIT</span>
+      </div>
+    </section>
+
+    <!-- Footer Toolbar -->
+    <footer class="footer">
+      <div class="footer-meta">
+        <span>THE CONTROLS CHANGE. THE PATTERN REMAINS.</span>
+      </div>
+      <div class="footer-actions">
+        <button class="text-button" id="pauseButton">PAUSE</button>
+        <button class="text-button" id="restartButton">RESTART LEVEL</button>
+        <button class="text-button" id="soundButton" aria-label="Toggle sound">SOUND ON</button>
+      </div>
+    </footer>
+  </main>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

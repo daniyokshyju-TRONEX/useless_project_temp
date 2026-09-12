@@ -1,0 +1,1731 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#080c14">
+  <title>UNPREDICTABLE // The Maze That Learns</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #070a10;
+      --line: #22303e;
+      --ink: #e6edf5;
+      --muted: #7b8896;
+      --dim: #3a4755;
+      --cyan: #70f4df;
+      --amber: #f8b85e;
+      --purple: #a98bff;
+      --red: #ff6574;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: 'Space Mono', Consolas, monospace;
+      overflow-x: hidden;
+    }
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: radial-gradient(circle at 50% 30%, #121c27 0%, #080c14 65%, #04060a 100%);
+    }
+    button { font: inherit; color: inherit; }
+    .game-shell {
+      width: min(960px, 100%);
+      min-height: 100vh;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 18px;
+      background: linear-gradient(180deg, #16202c, #0d141d);
+      border: 1px solid var(--line);
+      box-shadow: inset 0 1px rgba(255, 255, 255, 0.08), 0 8px 24px rgba(0, 0, 0, 0.5);
+    }
+    .brand-lockup {
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: 0.12em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand-mark { color: var(--cyan); }
+    .brand-lockup small {
+      font-size: 9px;
+      color: var(--muted);
+      letter-spacing: 0.18em;
+      margin-left: 6px;
+    }
+    .status-line {
+      font-size: 11px;
+      color: var(--cyan);
+      display: flex;
+      align-items: center;
+      letter-spacing: 0.08em;
+    }
+    .signal-dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 8px var(--cyan);
+      margin-right: 8px;
+      animation: pulse-dot 2s infinite ease-in-out;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 0.8; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(0.85); }
+    }
+    .playfield-wrap {
+      position: relative;
+      overflow: hidden;
+      min-height: 520px;
+      border: 1px solid var(--line);
+      background: radial-gradient(ellipse at 50% 50%, #101a24 0%, #070c12 60%, #030508 100%);
+      box-shadow: inset 0 1px rgba(255, 255, 255, 0.05), 0 18px 50px rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .playfield-wrap canvas {
+      max-width: 100%;
+      height: auto;
+      filter: drop-shadow(0 16px 32px rgba(0, 0, 0, 0.7));
+      border-radius: 4px;
+    }
+    .scanlines {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.06;
+      background: repeating-linear-gradient(0deg, transparent 0, transparent 3px, #fff 4px);
+    }
+    .glitch-flash {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      background: rgba(112, 244, 223, 0.15);
+      mix-blend-mode: screen;
+    }
+    .control-glitch .glitch-flash {
+      animation: glitch-anim 0.4s ease-out;
+    }
+    @keyframes glitch-anim {
+      0% { opacity: 0.8; transform: translateX(-3px); }
+      30% { opacity: 0.4; transform: translateX(3px); filter: hue-rotate(90deg); }
+      70% { opacity: 0.6; transform: translateX(-2px); }
+      100% { opacity: 0; transform: translateX(0); }
+    }
+    .shake {
+      animation: shake-anim 0.35s cubic-bezier(.36,.07,.19,.97) both;
+    }
+    @keyframes shake-anim {
+      10%, 90% { transform: translate3d(-2px, 0, 0); }
+      20%, 80% { transform: translate3d(3px, 0, 0); }
+      30%, 50%, 70% { transform: translate3d(-4px, 2px, 0); }
+      40%, 60% { transform: translate3d(4px, -2px, 0); }
+    }
+    .panel {
+      position: absolute;
+      z-index: 10;
+      inset: 0;
+      margin: auto;
+      width: min(500px, calc(100% - 32px));
+      height: max-content;
+      padding: 34px 28px;
+      text-align: center;
+      border: 1px solid #4a5c70;
+      background: linear-gradient(160deg, rgba(24, 35, 47, 0.96), rgba(11, 16, 23, 0.96));
+      box-shadow: inset 0 1px rgba(255, 255, 255, 0.15), 0 24px 70px rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(8px);
+    }
+    .panel h1 {
+      font-size: clamp(34px, 6vw, 48px);
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      margin: 14px 0 10px;
+      color: #fff;
+      text-shadow: 0 0 20px rgba(112, 244, 223, 0.3);
+    }
+    .panel h2 {
+      font-size: clamp(26px, 5vw, 36px);
+      font-weight: 700;
+      line-height: 1.15;
+      margin: 14px 0;
+    }
+    .panel h2 em { color: var(--cyan); font-style: normal; }
+    .eyebrow {
+      color: var(--cyan);
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+    .intro {
+      color: #9cb0c2;
+      font-size: 12px;
+      line-height: 1.65;
+      margin-bottom: 22px;
+    }
+    .fine-print {
+      color: var(--dim);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      margin-top: 18px;
+    }
+    .button {
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 13px 24px;
+      background: var(--cyan);
+      color: #061017;
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: 0.1em;
+      border: 1px solid var(--cyan);
+      box-shadow: inset 0 1px rgba(255, 255, 255, 0.6), 0 5px 0 #13403f, 0 10px 20px rgba(0, 0, 0, 0.4);
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .button span { font-size: 10px; opacity: 0.75; }
+    .button:hover {
+      transform: translateY(2px);
+      box-shadow: inset 0 1px rgba(255, 255, 255, 0.8), 0 3px 0 #13403f, 0 12px 25px rgba(112, 244, 223, 0.25);
+    }
+    .hud {
+      display: flex;
+      align-items: center;
+      padding: 10px 14px;
+      background: linear-gradient(180deg, #141d26, #0c1219);
+      border: 1px solid var(--line);
+      box-shadow: inset 0 1px rgba(255, 255, 255, 0.05), 0 8px 20px rgba(0, 0, 0, 0.4);
+      flex-wrap: wrap;
+      gap: 0;
+    }
+    .hud-block {
+      min-width: 120px;
+      padding: 4px 18px;
+      border-right: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .hud-block:first-child { padding-left: 4px; }
+    .hud-label {
+      font-size: 9px;
+      color: var(--muted);
+      letter-spacing: 0.14em;
+    }
+    .level-name {
+      font-size: 9px;
+      color: var(--dim);
+      letter-spacing: 0.08em;
+    }
+    .hud strong { font-size: 18px; font-weight: 700; }
+    .attempts-block strong { color: var(--amber); }
+    .checkpoint-block strong { color: var(--cyan); }
+    .accuracy-block strong { color: var(--cyan); transition: color 0.2s ease; }
+    .accuracy-block.low strong { color: var(--amber); }
+    .accuracy-block.depleted strong { color: var(--red); animation: pulse-red 0.5s infinite alternate; }
+    @keyframes pulse-red {
+      from { opacity: 0.6; text-shadow: none; }
+      to { opacity: 1; text-shadow: 0 0 10px rgba(255, 101, 116, 0.8); }
+    }
+    .accuracy-bar {
+      display: block; width: 80px; height: 4px; background: var(--dim);
+      border-radius: 2px; overflow: hidden; margin-top: 3px;
+    }
+    .accuracy-bar i {
+      display: block; height: 100%; width: 100%; background: var(--cyan);
+      border-radius: 2px; transition: width 0.15s ease, background-color 0.25s ease;
+    }
+    .accuracy-block.low .accuracy-bar i { background: var(--amber); }
+    .accuracy-block.depleted .accuracy-bar i { background: var(--red); }
+    .attempt-pips { display: flex; gap: 5px; margin-top: 3px; }
+    .attempt-pips i {
+      width: 14px;
+      height: 4px;
+      background: var(--amber);
+      border-radius: 1px;
+    }
+    .attempt-pips i.off { background: var(--dim); opacity: 0.4; }
+    .legend {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 10px;
+      color: var(--muted);
+    }
+    .legend-swatch {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      margin-right: 5px;
+      vertical-align: middle;
+    }
+    .player-swatch { background: var(--cyan); }
+    .key-swatch { background: var(--amber); }
+    .exit-swatch { border: 1px solid var(--purple); background: rgba(169, 139, 255, 0.3); }
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      background: #090e15;
+      border: 1px solid var(--line);
+      font-size: 10px;
+      color: var(--dim);
+      letter-spacing: 0.08em;
+    }
+    .footer-actions { display: flex; gap: 16px; }
+    .text-button {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font: inherit;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      transition: color 0.15s;
+    }
+    .text-button:hover { color: var(--cyan); }
+    @media (max-width: 768px) {
+      .game-shell { padding: 8px; }
+      .hud { flex-direction: row; }
+      .hud-block { min-width: 25%; padding: 4px 8px; }
+      .legend { width: 100%; margin-top: 8px; justify-content: center; }
+      .footer-meta { display: none; }
+      .footer { justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+  <main class="game-shell" id="gameShell">
+    <header class="topbar">
+      <div class="brand-lockup">
+        <span class="brand-mark">//</span>
+        <span>UNPREDICTABLE</span>
+        <small>STANDALONE EDITION</small>
+      </div>
+      <div class="status-line">
+        <span class="signal-dot"></span>
+        <span id="statusText">SIGNAL STABLE</span>
+      </div>
+    </header>
+
+    <section class="playfield-wrap">
+      <canvas id="gameCanvas" aria-label="Playable top-down maze"></canvas>
+      <div class="scanlines"></div>
+      <div class="glitch-flash" id="glitchFlash"></div>
+
+      <!-- Start Panel -->
+      <div class="start-panel panel" id="startPanel">
+        <p class="eyebrow">STANDALONE TRIAL</p>
+        <h1>UNPREDICTABLE</h1>
+        <p class="intro">The maze looks simple. But your keyboard controls are themselves the trap.</p>
+        <button class="button button-primary" id="startButton">START GAME <span>↵ Enter</span></button>
+        <p class="fine-print">ARROW KEYS OR WASD &bull; DISCOVER THE SECRET PATTERNS &bull; ESCAPE</p>
+      </div>
+
+      <!-- Pause Panel -->
+      <div class="pause-panel panel" id="pausePanel" hidden>
+        <p class="eyebrow">TRANSMISSION PAUSED</p>
+        <h2>Stay still.<br><em>Think again.</em></h2>
+        <p class="intro">The maze waits for your next hesitation.</p>
+        <button class="button button-primary" id="continueButton">CONTINUE <span>↵ Enter</span></button>
+      </div>
+
+      <!-- Message Panel -->
+      <div class="message-panel panel" id="messagePanel" hidden>
+        <p class="eyebrow" id="messageKicker">SIGNAL LOST</p>
+        <h2 id="messageTitle">THE MAZE WON.</h2>
+        <p id="messageBody">Your keystrokes were predicted before you pressed them.</p>
+        <button class="button button-primary" id="messageAction">TRY AGAIN <span>↵ Enter</span></button>
+      </div>
+    </section>
+
+    <!-- HUD -->
+    <section class="hud">
+      <div class="hud-block">
+        <span class="hud-label">LEVEL</span>
+        <strong id="levelValue">1 / 5</strong>
+        <span class="level-name" id="levelName">FIRST IMPRESSION</span>
+      </div>
+      <div class="hud-block">
+        <span class="hud-label">KEYS</span>
+        <strong id="keysValue">0</strong>
+        <span class="level-name">COLLECTED</span>
+      </div>
+      <div class="hud-block attempts-block">
+        <span class="hud-label">ATTEMPTS</span>
+        <strong id="attemptsValue">3</strong>
+        <span class="attempt-pips" id="attemptPips"><i></i><i></i><i></i></span>
+      </div>
+      <div class="hud-block checkpoint-block">
+        <span class="hud-label">CHECKPOINT</span>
+        <strong id="checkpointValue">ORIGIN</strong>
+        <span class="level-name" id="checkpointName">START</span>
+      </div>
+      <div class="hud-block accuracy-block" id="accuracyBlock">
+        <span class="hud-label">ACCURACY</span>
+        <strong id="accuracyValue">100%</strong>
+        <span class="accuracy-bar"><i id="accuracyBar" style="width: 100%;"></i></span>
+        <span class="level-name" id="accuracyStatus">OPTIMAL</span>
+      </div>
+      <div class="legend">
+        <span><i class="legend-swatch player-swatch"></i>YOU</span>
+        <span><i class="legend-swatch key-swatch"></i>KEY</span>
+        <span><i class="legend-swatch exit-swatch"></i>EXIT</span>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer-meta">
+        <span>THE CONTROLS CHANGE. THE PATTERN REMAINS.</span>
+      </div>
+      <div class="footer-actions">
+        <button class="text-button" id="pauseButton">PAUSE</button>
+        <button class="text-button" id="restartButton">RESTART LEVEL</button>
+        <button class="text-button" id="soundButton" aria-label="Toggle sound">SOUND ON</button>
+      </div>
+    </footer>
+  </main>
+
+  <script>
+    // INLINED ENGINE FOR ZERO-DEPENDENCY DIRECT FILE LAUNCH
+    const DIRECTIONS = ['up', 'right', 'down', 'left'];
+
+    class ControlManager {
+      constructor(onChange) {
+        this.onChange = onChange;
+        this.mode = 'NORMAL';
+        this.controlMap = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
+        this.delayMs = 0;
+        this.pendingInputs = [];
+        this.setNormalControls(false);
+      }
+      setMap(name, mapping, delay = 0, announce = true) {
+        this.mode = name;
+        this.controlMap = { ...mapping };
+        this.delayMs = delay;
+        if (announce && this.onChange) this.onChange(name, this);
+      }
+      setNormalControls(announce = true) {
+        this.setMap('NORMAL', { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }, 0, announce);
+      }
+      setReversedControls(announce = true) {
+        this.setMap('REVERSED', { ArrowUp: 'down', ArrowDown: 'up', ArrowLeft: 'right', ArrowRight: 'left' }, 0, announce);
+      }
+      setRotatedControls(direction = 'right', announce = true) {
+        if (direction === 'left') {
+          this.setMap('ROTATED_LEFT', { ArrowUp: 'left', ArrowLeft: 'down', ArrowDown: 'right', ArrowRight: 'up' }, 0, announce);
+        } else {
+          this.setMap('ROTATED_RIGHT', { ArrowUp: 'right', ArrowRight: 'down', ArrowDown: 'left', ArrowLeft: 'up' }, 0, announce);
+        }
+      }
+      setMirroredControls(axis = 'horizontal', announce = true) {
+        if (axis === 'vertical') {
+          this.setMap('MIRRORED', { ArrowUp: 'down', ArrowDown: 'up', ArrowLeft: 'left', ArrowRight: 'right' }, 0, announce);
+        } else {
+          this.setMap('MIRRORED', { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'right', ArrowRight: 'left' }, 0, announce);
+        }
+      }
+      setRandomControls(seed = 1, announce = true) {
+        const permutations = [
+          { ArrowUp: 'right', ArrowRight: 'up', ArrowDown: 'left', ArrowLeft: 'down' },
+          { ArrowUp: 'down', ArrowRight: 'left', ArrowDown: 'up', ArrowLeft: 'right' },
+          { ArrowUp: 'left', ArrowRight: 'down', ArrowDown: 'right', ArrowLeft: 'up' },
+          { ArrowUp: 'right', ArrowRight: 'left', ArrowDown: 'up', ArrowLeft: 'down' }
+        ];
+        const index = Math.abs(seed) % permutations.length;
+        this.setMap('RANDOMIZED', permutations[index], 0, announce);
+      }
+      setDelayedControls(delayMs = 500, announce = true) {
+        this.setMap('DELAYED', { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }, delayMs, announce);
+      }
+      resetControls() {
+        this.pendingInputs = [];
+        this.setNormalControls(false);
+      }
+      resolve(key, now = performance.now()) {
+        const direction = this.controlMap[key];
+        if (!direction) return null;
+        if (this.delayMs > 0) {
+          const executeAt = now + this.delayMs;
+          this.pendingInputs.push({ direction, executeAt });
+          return { queued: true, direction, executeAt };
+        }
+        return { queued: false, direction };
+      }
+      drain(now = performance.now()) {
+        if (this.pendingInputs.length === 0) return [];
+        const ready = [];
+        const remaining = [];
+        for (const item of this.pendingInputs) {
+          if (item.executeAt <= now) ready.push(item);
+          else remaining.push(item);
+        }
+        this.pendingInputs = remaining;
+        return ready;
+      }
+      applyTwist(direction, twist = 'none') {
+        const index = DIRECTIONS.indexOf(direction);
+        if (index === -1) return direction;
+        switch (twist) {
+          case 'rotate-right': return DIRECTIONS[(index + 1) % 4];
+          case 'rotate-left': return DIRECTIONS[(index + 3) % 4];
+          case 'invert': return DIRECTIONS[(index + 2) % 4];
+          case 'mirror-horizontal': return direction === 'left' ? 'right' : direction === 'right' ? 'left' : direction;
+          case 'mirror-vertical': return direction === 'up' ? 'down' : direction === 'down' ? 'up' : direction;
+          default: return direction;
+        }
+      }
+    }
+
+    class AudioManager {
+      constructor() { this.context = null; this.enabled = true; }
+      unlock() {
+        if (!this.enabled) return;
+        try {
+          if (!this.context) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) this.context = new AudioCtx();
+          }
+          if (this.context && this.context.state === 'suspended') this.context.resume();
+        } catch (e) {}
+      }
+      tone(frequency, duration = 0.08, type = 'sine', volume = 0.04, freqEnd = null) {
+        if (!this.enabled) return;
+        this.unlock();
+        if (!this.context) return;
+        try {
+          const now = this.context.currentTime;
+          const osc = this.context.createOscillator();
+          const gain = this.context.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(frequency, now);
+          if (freqEnd !== null) osc.frequency.exponentialRampToValueAtTime(Math.max(10, freqEnd), now + duration);
+          gain.gain.setValueAtTime(volume, now);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+          osc.connect(gain);
+          gain.connect(this.context.destination);
+          osc.start(now);
+          osc.stop(now + duration);
+        } catch (err) {}
+      }
+      movement() { this.tone(190, 0.035, 'triangle', 0.02, 130); }
+      key() {
+        this.tone(587.33, 0.12, 'sine', 0.05);
+        setTimeout(() => this.tone(880, 0.2, 'triangle', 0.04), 80);
+        setTimeout(() => this.tone(1174.66, 0.28, 'sine', 0.03), 160);
+      }
+      trap() {
+        this.tone(160, 0.35, 'sawtooth', 0.08, 40);
+        this.tone(90, 0.25, 'square', 0.06, 30);
+      }
+      trapTrigger() { this.tone(340, 0.06, 'sine', 0.03, 180); }
+      control() {
+        this.tone(420, 0.1, 'square', 0.04, 210);
+        setTimeout(() => this.tone(630, 0.14, 'sawtooth', 0.035, 140), 60);
+      }
+      checkpoint() {
+        this.tone(440, 0.12, 'sine', 0.04);
+        setTimeout(() => this.tone(659.25, 0.22, 'sine', 0.035), 90);
+      }
+      complete() {
+        [440, 554.37, 659.25, 880].forEach((freq, idx) => {
+          setTimeout(() => this.tone(freq, 0.24, 'sine', 0.04), idx * 110);
+        });
+      }
+      gameOver() {
+        this.tone(180, 0.5, 'sawtooth', 0.07, 45);
+        setTimeout(() => this.tone(130, 0.6, 'sawtooth', 0.06, 30), 200);
+      }
+      glitch() {
+        this.tone(320, 0.08, 'square', 0.05, 80);
+        setTimeout(() => this.tone(520, 0.08, 'sawtooth', 0.04, 90), 40);
+      }
+      toggle() { this.enabled = !this.enabled; return this.enabled; }
+    }
+
+    function canWalk(level, x, y) {
+      if (!level || y < 0 || y >= level.height || x < 0 || x >= level.width) return false;
+      return level.map[y][x] !== '#';
+    }
+
+    function directionVector(direction) {
+      switch (direction) {
+        case 'up': return [0, -1];
+        case 'right': return [1, 0];
+        case 'down': return [0, 1];
+        case 'left': return [-1, 0];
+        default: return [0, 0];
+      }
+    }
+
+    function shortestPathLength(level, start, goal) {
+      if (!start || !goal) return Infinity;
+      if (start.x === goal.x && start.y === goal.y) return 0;
+      const queue = [{ x: start.x, y: start.y, distance: 0 }];
+      const visited = new Set([`${start.x},${start.y}`]);
+      while (queue.length > 0) {
+        const current = queue.shift();
+        if (current.x === goal.x && current.y === goal.y) return current.distance;
+        for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+          const nx = current.x + dx;
+          const ny = current.y + dy;
+          const key = `${nx},${ny}`;
+          if (canWalk(level, nx, ny) && !visited.has(key)) {
+            visited.add(key);
+            queue.push({ x: nx, y: ny, distance: current.distance + 1 });
+          }
+        }
+      }
+      return Infinity;
+    }
+
+    function validateLevel(level) {
+      if (!level || !level.start || !level.exit) return false;
+      if (!canWalk(level, level.start.x, level.start.y) || !canWalk(level, level.exit.x, level.exit.y)) return false;
+      if (level.key && level.requiresKey) {
+        return shortestPathLength(level, level.start, level.key) !== Infinity &&
+               shortestPathLength(level, level.key, level.exit) !== Infinity;
+      }
+      return shortestPathLength(level, level.start, level.exit) !== Infinity;
+    }
+
+    class Player {
+      constructor(start = { x: 1, y: 1 }) {
+        this.speed = 0.22;
+        this.facing = 'down';
+        this.invulnerable = false;
+        this.invulnerableTimer = 0;
+        this.deathProgress = 0;
+        this.isDying = false;
+        this.stepCycle = 0;
+        this.reset(start);
+      }
+      reset(position) {
+        this.x = position.x;
+        this.y = position.y;
+        this.targetX = position.x;
+        this.targetY = position.y;
+        this.moving = false;
+        this.hasKey = false;
+        this.checkpoint = { ...position };
+        this.twist = 'none';
+        this.invulnerable = false;
+        this.isDying = false;
+        this.deathProgress = 0;
+        this.facing = 'down';
+      }
+      setCheckpoint(position) { this.checkpoint = { ...position }; }
+      respawn() {
+        this.reset(this.checkpoint);
+        this.invulnerable = true;
+        this.invulnerableTimer = 600;
+      }
+      moveTo(x, y, direction = 'down') {
+        this.targetX = x;
+        this.targetY = y;
+        this.moving = true;
+        this.facing = direction;
+      }
+      update(delta = 16) {
+        if (this.invulnerableTimer > 0) {
+          this.invulnerableTimer -= delta;
+          if (this.invulnerableTimer <= 0) this.invulnerable = false;
+        }
+        if (this.isDying) {
+          this.deathProgress = Math.min(1, this.deathProgress + delta * 0.003);
+          return;
+        }
+        if (this.moving) {
+          const dx = this.targetX - this.x;
+          const dy = this.targetY - this.y;
+          this.x += dx * this.speed;
+          this.y += dy * this.speed;
+          this.stepCycle += delta * 0.015;
+          if (Math.abs(dx) < 0.03 && Math.abs(dy) < 0.03) {
+            this.x = this.targetX;
+            this.y = this.targetY;
+            this.moving = false;
+          }
+        }
+      }
+      get tile() { return { x: Math.round(this.targetX), y: Math.round(this.targetY) }; }
+      draw(ctx, size) {
+        if (this.isDying && this.deathProgress >= 1) return;
+        const px = this.x * size + size / 2;
+        const py = this.y * size + size / 2;
+        const time = Date.now();
+        ctx.save();
+        if (this.invulnerable && Math.floor(time / 80) % 2 === 0) ctx.globalAlpha = 0.55;
+        if (this.isDying) {
+          const scale = Math.max(0.01, 1 - this.deathProgress);
+          ctx.translate(px, py);
+          ctx.scale(scale, scale);
+          ctx.rotate(this.deathProgress * Math.PI * 3);
+          ctx.translate(-px, -py);
+          ctx.globalAlpha = 1 - this.deathProgress;
+        }
+        const pulseRadius = size * 0.44 + Math.sin(time * 0.006) * 3;
+        ctx.strokeStyle = 'rgba(112, 244, 223, 0.35)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(px, py, pulseRadius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        const aura = ctx.createRadialGradient(px, py, 2, px, py, size * 0.65);
+        aura.addColorStop(0, 'rgba(112, 244, 223, 0.65)');
+        aura.addColorStop(0.4, 'rgba(112, 244, 223, 0.25)');
+        aura.addColorStop(1, 'rgba(112, 244, 223, 0)');
+        ctx.fillStyle = aura;
+        ctx.beginPath();
+        ctx.arc(px, py, size * 0.65, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+        ctx.beginPath();
+        ctx.ellipse(px, py + size * 0.3, size * 0.32, size * 0.12, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        const bob = this.moving ? Math.sin(this.stepCycle) * 1.5 : 0;
+        const bodyRadius = size * 0.3;
+
+        ctx.fillStyle = '#04151b';
+        ctx.beginPath();
+        ctx.arc(px, py + bob, bodyRadius + 2.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        const bodyGrad = ctx.createRadialGradient(px - 4, py - 5 + bob, 1, px, py + bob, bodyRadius);
+        bodyGrad.addColorStop(0, '#ffffff');
+        bodyGrad.addColorStop(0.3, '#70f4df');
+        bodyGrad.addColorStop(0.8, '#12a49f');
+        bodyGrad.addColorStop(1, '#055452');
+        ctx.fillStyle = bodyGrad;
+        ctx.beginPath();
+        ctx.arc(px, py + bob, bodyRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        let eyeDx = 0, eyeDy = 0;
+        if (this.facing === 'left') eyeDx = -6;
+        if (this.facing === 'right') eyeDx = 6;
+        if (this.facing === 'up') eyeDy = -6;
+        if (this.facing === 'down') eyeDy = 5;
+
+        ctx.fillStyle = '#031015';
+        ctx.beginPath();
+        ctx.ellipse(px + eyeDx, py + eyeDy + bob, 6, 4.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#70f4df';
+        ctx.beginPath();
+        ctx.arc(px + eyeDx, py + eyeDy + bob, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(px + eyeDx + (eyeDx ? Math.sign(eyeDx) * 1 : 0), py + eyeDy + bob - 1, 1.3, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (this.hasKey) {
+          const orbitAngle = time * 0.005;
+          const ox = px + Math.cos(orbitAngle) * (size * 0.42);
+          const oy = py + Math.sin(orbitAngle) * (size * 0.42);
+          ctx.fillStyle = '#f8b85e';
+          ctx.beginPath();
+          ctx.arc(ox, oy, 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+    }
+
+    class TrapManager {
+      constructor(game) {
+        this.game = game;
+        this.traps = [];
+        this.checkpoints = [];
+        this.zones = [];
+        this.discovered = new Set();
+        this.triggered = new Set();
+        this.crumbles = new Map();
+        this.movingWalls = [];
+        this.movingEnemies = [];
+        this.tempWalls = [];
+        this.elapsedTime = 0;
+      }
+      load(level) {
+        this.level = level;
+        this.traps = level.traps ? [...level.traps] : [];
+        this.checkpoints = level.checkpoints ? [...level.checkpoints] : [];
+        this.zones = level.zones ? [...level.zones] : [];
+        this.discovered.clear();
+        this.triggered.clear();
+        this.crumbles.clear();
+        this.elapsedTime = 0;
+
+        this.movingWalls = (level.movingWalls || []).map(mw => ({
+          x: mw.from.x, y: mw.from.y,
+          fromX: mw.from.x, fromY: mw.from.y,
+          toX: mw.to.x, toY: mw.to.y,
+          progress: 0, direction: 1,
+          speed: mw.speed || 0.0008,
+          pauseTimer: 0, pauseDuration: mw.pause || 800
+        }));
+
+        this.movingEnemies = (level.enemies || []).map(e => ({
+          x: e.path[0].x, y: e.path[0].y,
+          path: e.path, targetIndex: 1,
+          progress: 0, speed: e.speed || 0.0015,
+          color: e.color || '#ff4f64'
+        }));
+
+        this.tempWalls = (level.tempWalls || []).map(tw => ({
+          x: tw.x, y: tw.y,
+          period: tw.period || 2400,
+          timer: tw.initialOffset || 0,
+          solid: true
+        }));
+      }
+      trapAt(x, y) { return this.traps.find(t => t.x === x && t.y === y); }
+      checkpointAt(x, y) { return this.checkpoints.find(cp => cp.x === x && cp.y === y); }
+      zoneAt(x, y) { return this.zones.find(z => z.x === x && z.y === y); }
+
+      handleTile(x, y) {
+        const key = `${x},${y}`;
+        const cp = this.checkpointAt(x, y);
+        if (cp) this.game.activateCheckpoint(cp);
+
+        const zone = this.zoneAt(x, y);
+        if (zone) this.game.changeControls(zone.mode, zone.seed || 1);
+
+        const twistTrap = this.traps.find(t => t.x === x && t.y === y && t.type === 'twist');
+        if (twistTrap) {
+          this.game.player.twist = twistTrap.twist || 'rotate-right';
+          this.discovered.add(key);
+          this.game.notifyControlChange('TWIST TILE ENGAGED');
+        }
+
+        const crumbleTrap = this.traps.find(t => t.x === x && t.y === y && (t.type === 'falling' || t.type === 'disappearing-floor'));
+        if (crumbleTrap) {
+          this.discovered.add(key);
+          const state = this.crumbles.get(key);
+          if (state && state.fallen) {
+            this.game.damage('FALLEN INTO VOID');
+            return;
+          }
+          if (!state) {
+            this.crumbles.set(key, { progress: 0, fallen: false, delay: crumbleTrap.delay || 700 });
+            this.game.audio.trapTrigger();
+          }
+        }
+
+        const trap = this.trapAt(x, y);
+        if (trap) {
+          this.discovered.add(key);
+          const canRetrigger = ['direction', 'delay', 'teleport', 'invisible-trigger', 'spike', 'fake-safe', 'fake-exit', 'reset'].includes(trap.type);
+          if (!this.triggered.has(key) || canRetrigger) {
+            this.triggered.add(key);
+            this.activate(trap, x, y);
+          }
+        }
+      }
+
+      activate(trap, x, y) {
+        switch (trap.type) {
+          case 'spike':
+            this.game.damage(trap.label || 'SPIKE TRAP ACTIVATED');
+            break;
+          case 'fake-safe':
+            this.game.damage(trap.label || 'FAKE SAFE PATH COLLAPSED');
+            break;
+          case 'fake-exit':
+            this.game.ui.glitch();
+            this.game.ui.shake();
+            this.game.audio.glitch();
+            if (trap.to) {
+              this.game.teleport(trap.to);
+              this.game.status = 'THE EXIT WAS AN ILLUSION';
+            } else {
+              this.game.damage('DECOY EXIT COLLAPSED');
+            }
+            break;
+          case 'teleport':
+            if (trap.to) {
+              this.game.teleport(trap.to);
+              this.game.status = trap.label || 'THE MAZE FOLDED';
+            }
+            break;
+          case 'direction':
+            this.game.changeControls(trap.mode, trap.seed || 1);
+            if (trap.label) this.game.status = trap.label;
+            break;
+          case 'delay':
+            this.game.controls.setDelayedControls(trap.delay || 500);
+            this.game.notifyControlChange('INPUT DELAY ENGAGED (500ms)');
+            break;
+          case 'reset':
+            this.game.teleport(this.game.player.checkpoint);
+            this.game.status = trap.label || 'RESET TRAP TRIGGERED';
+            break;
+          case 'invisible-trigger':
+            if (trap.targetWall) {
+              this.toggleWallAt(trap.targetWall.x, trap.targetWall.y);
+              this.game.notifyControlChange('A WALL SHIFTED IN THE DARK');
+            } else if (trap.mode) {
+              this.game.changeControls(trap.mode, trap.seed || 1);
+            }
+            break;
+          case 'one-way':
+            this.game.oneWay = trap.direction;
+            this.game.notifyControlChange(`ONE-WAY: MUST MOVE ${trap.direction.toUpperCase()}`);
+            break;
+        }
+      }
+
+      toggleWallAt(x, y) {
+        const existing = this.tempWalls.find(w => w.x === x && w.y === y);
+        if (existing) existing.solid = !existing.solid;
+        else this.tempWalls.push({ x, y, solid: true, period: 0, timer: 0 });
+      }
+
+      isWall(x, y) {
+        for (const mw of this.movingWalls) {
+          if (Math.round(mw.x) === x && Math.round(mw.y) === y) return true;
+        }
+        for (const tw of this.tempWalls) {
+          if (tw.x === x && tw.y === y && tw.solid) return true;
+        }
+        return false;
+      }
+
+      update(delta) {
+        this.elapsedTime += delta;
+        for (const [key, state] of this.crumbles.entries()) {
+          if (!state.fallen) {
+            state.progress += delta / state.delay;
+            if (state.progress >= 1) {
+              state.progress = 1;
+              state.fallen = true;
+              const [cx, cy] = key.split(',').map(Number);
+              if (this.game.player.tile.x === cx && this.game.player.tile.y === cy && !this.game.player.moving) {
+                this.game.damage('FLOOR COLLAPSED UNDERNEATH');
+              }
+            }
+          }
+        }
+        for (const tw of this.tempWalls) {
+          if (tw.period > 0) {
+            tw.timer += delta;
+            if (tw.timer >= tw.period) {
+              tw.timer = 0;
+              tw.solid = !tw.solid;
+            }
+          }
+        }
+        for (const mw of this.movingWalls) {
+          if (mw.pauseTimer > 0) {
+            mw.pauseTimer -= delta;
+            continue;
+          }
+          mw.progress += mw.direction * mw.speed * delta;
+          if (mw.progress >= 1) {
+            mw.progress = 1;
+            mw.direction = -1;
+            mw.pauseTimer = mw.pauseDuration;
+          } else if (mw.progress <= 0) {
+            mw.progress = 0;
+            mw.direction = 1;
+            mw.pauseTimer = mw.pauseDuration;
+          }
+          mw.x = mw.fromX + (mw.toX - mw.fromX) * mw.progress;
+          mw.y = mw.fromY + (mw.toY - mw.fromY) * mw.progress;
+          if (Math.hypot(mw.x - this.game.player.x, mw.y - this.game.player.y) < 0.6) {
+            this.game.damage('CRUSHED BY MOVING WALL');
+          }
+        }
+        for (const enemy of this.movingEnemies) {
+          const from = enemy.path[(enemy.targetIndex - 1 + enemy.path.length) % enemy.path.length];
+          const to = enemy.path[enemy.targetIndex];
+          enemy.progress += enemy.speed * delta;
+          if (enemy.progress >= 1) {
+            enemy.progress = 0;
+            enemy.targetIndex = (enemy.targetIndex + 1) % enemy.path.length;
+            enemy.x = to.x;
+            enemy.y = to.y;
+          } else {
+            enemy.x = from.x + (to.x - from.x) * enemy.progress;
+            enemy.y = from.y + (to.y - from.y) * enemy.progress;
+          }
+          if (Math.hypot(enemy.x - this.game.player.x, enemy.y - this.game.player.y) < 0.65) {
+            this.game.damage('CAUGHT BY THE PATROLLING WATCHER');
+          }
+        }
+      }
+
+      draw(ctx, size) {
+        const time = this.elapsedTime;
+        for (const zone of this.zones) {
+          const zx = zone.x * size;
+          const zy = zone.y * size;
+          ctx.save();
+          const shimmer = Math.sin(time * 0.003 + zone.x * 2 + zone.y * 3) * 0.12 + 0.15;
+          ctx.fillStyle = zone.mode === 'REVERSED' ? `rgba(255, 101, 116, ${shimmer})`
+            : zone.mode.startsWith('ROTATED') ? `rgba(169, 139, 255, ${shimmer})`
+            : `rgba(112, 244, 223, ${shimmer})`;
+          ctx.fillRect(zx + 2, zy + 2, size - 4, size - 4);
+          ctx.strokeStyle = ctx.fillStyle;
+          ctx.strokeRect(zx + 3, zy + 3, size - 6, size - 6);
+          ctx.restore();
+        }
+        for (const trap of this.traps) {
+          const key = `${trap.x},${trap.y}`;
+          const px = trap.x * size;
+          const py = trap.y * size;
+          const isDiscovered = this.discovered.has(key);
+          ctx.save();
+          ctx.translate(px + size / 2, py + size / 2);
+          if (trap.type === 'spike') {
+            ctx.fillStyle = '#1a1f29';
+            ctx.fillRect(-size * 0.35, -size * 0.35, size * 0.7, size * 0.7);
+            if (isDiscovered) {
+              ctx.fillStyle = '#ff6574';
+              [-8, 8].forEach(sx => {
+                [-8, 8].forEach(sy => {
+                  ctx.beginPath();
+                  ctx.moveTo(sx, sy - 5); ctx.lineTo(sx - 3, sy + 3); ctx.lineTo(sx + 3, sy + 3);
+                  ctx.closePath(); ctx.fill();
+                });
+              });
+            }
+          } else if (trap.type === 'falling' || trap.type === 'disappearing-floor') {
+            const state = this.crumbles.get(key);
+            if (state && state.fallen) {
+              ctx.fillStyle = '#020305';
+              ctx.fillRect(-size / 2 + 1, -size / 2 + 1, size - 2, size - 2);
+            } else if (isDiscovered) {
+              ctx.strokeStyle = 'rgba(248, 184, 94, 0.4)';
+              ctx.strokeRect(-size * 0.3, -size * 0.3, size * 0.6, size * 0.6);
+            }
+          } else if (trap.type === 'fake-exit') {
+            ctx.strokeStyle = '#a98bff';
+            ctx.strokeRect(-12, -12, 24, 24);
+            ctx.fillStyle = '#a98bff';
+            ctx.font = '700 8px Consolas';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText('EXIT?', 0, 0);
+          } else if (trap.type === 'teleport' && isDiscovered) {
+            ctx.strokeStyle = '#70f4df';
+            ctx.beginPath();
+            ctx.arc(0, 0, 9, 0, Math.PI * 2);
+            ctx.stroke();
+          } else if (trap.type === 'one-way') {
+            ctx.fillStyle = '#70f4df';
+            ctx.save();
+            const dirAngle = { up: -Math.PI / 2, right: 0, down: Math.PI / 2, left: Math.PI }[trap.direction || 'right'];
+            ctx.rotate(dirAngle);
+            ctx.beginPath();
+            ctx.moveTo(7, 0); ctx.lineTo(-5, -6); ctx.lineTo(-2, 0); ctx.lineTo(-5, 6);
+            ctx.closePath(); ctx.fill();
+            ctx.restore();
+          } else if (trap.type === 'twist') {
+            ctx.strokeStyle = '#ff6574';
+            ctx.strokeRect(-9, -9, 18, 18);
+            ctx.fillStyle = '#ff6574';
+            ctx.font = '700 10px Consolas';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText('⇄', 0, 0);
+          }
+          ctx.restore();
+        }
+        for (const tw of this.tempWalls) {
+          if (tw.solid) {
+            const tx = tw.x * size;
+            const ty = tw.y * size;
+            ctx.save();
+            ctx.fillStyle = '#39213d';
+            ctx.fillRect(tx + 2, ty + 2, size - 4, size - 4);
+            ctx.strokeStyle = '#a98bff';
+            ctx.strokeRect(tx + 3, ty + 3, size - 6, size - 6);
+            ctx.restore();
+          }
+        }
+        for (const mw of this.movingWalls) {
+          const mx = mw.x * size;
+          const my = mw.y * size;
+          ctx.save();
+          ctx.fillStyle = '#1c2834';
+          ctx.fillRect(mx + 2, my + 2, size - 4, size - 4);
+          ctx.strokeStyle = '#ff6574';
+          ctx.strokeRect(mx + 3, my + 3, size - 6, size - 6);
+          ctx.restore();
+        }
+        for (const enemy of this.movingEnemies) {
+          const ex = enemy.x * size + size / 2;
+          const ey = enemy.y * size + size / 2;
+          ctx.save();
+          const aura = ctx.createRadialGradient(ex, ey, 2, ex, ey, size * 0.55);
+          aura.addColorStop(0, 'rgba(255, 79, 100, 0.7)');
+          aura.addColorStop(1, 'rgba(255, 79, 100, 0)');
+          ctx.fillStyle = aura;
+          ctx.beginPath();
+          ctx.arc(ex, ey, size * 0.55, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#0a0d14';
+          ctx.beginPath();
+          ctx.arc(ex, ey, size * 0.28, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = enemy.color;
+          ctx.stroke();
+          ctx.fillStyle = enemy.color;
+          ctx.beginPath();
+          ctx.arc(ex, ey, 4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+    }
+
+    const LEVELS = [
+      {
+        id: 1, name: 'FIRST IMPRESSION', subtitle: 'LEARN THE RULES / PREPARE FOR BETRAYAL',
+        map: [
+          '#############', '#S..#.......#', '#.#.#.#####.#', '#.#...#...#.#',
+          '#.#####.#.#.#', '#.......#...#', '#####.#####.#', '#...#.#.....#',
+          '#.#.#.#.###.#', '#.#...#.#...#', '#.#####.#.#.#', '#.........#E#',
+          '#############'
+        ],
+        start: { x: 1, y: 1 }, exit: { x: 11, y: 11 }, key: { x: 11, y: 1 }, requiresKey: true,
+        checkpoints: [{ x: 5, y: 5, name: 'CENTRAL HALL' }],
+        traps: [
+          { x: 3, y: 1, type: 'spike', label: 'A SUDDEN SPIKE' },
+          { x: 7, y: 5, type: 'fake-safe', label: 'SAFE WAS AN ILLUSION' },
+          { x: 9, y: 9, type: 'spike', label: 'SURPRISE DEFENSE' }
+        ],
+        zones: [{ x: 3, y: 5, mode: 'NORMAL' }]
+      },
+      {
+        id: 2, name: 'THE SECOND GUESS', subtitle: 'GEOMETRIC ROTATIONS & DECEPTIVE FLOORS',
+        map: [
+          '#############', '#S..#.......#', '#.#.###.###.#', '#.#...#.#...#',
+          '#.###.#.#.###', '#...#.#.#...#', '###.#.#.###.#', '#...#.....#.#',
+          '#.#######.#.#', '#.#.....#.#.#', '#.#.###.#.#.#', '#...#.....#E#',
+          '#############'
+        ],
+        start: { x: 1, y: 1 }, exit: { x: 11, y: 11 }, key: { x: 11, y: 3 }, requiresKey: true,
+        checkpoints: [{ x: 5, y: 7, name: 'CROSSROAD' }],
+        traps: [
+          { x: 3, y: 1, type: 'fake-safe', label: 'FLOOR COLLAPSED' },
+          { x: 9, y: 1, type: 'direction', mode: 'ROTATED_RIGHT', label: 'EAST WING: 90° ROTATION' },
+          { x: 3, y: 7, type: 'falling', delay: 800, label: 'CRUMBLING RUNWAY' },
+          { x: 1, y: 9, type: 'direction', mode: 'ROTATED_LEFT', label: 'WEST SHAFT: COUNTER-ROTATION' },
+          { x: 7, y: 11, type: 'twist', twist: 'rotate-right', label: 'TWIST TILE APPLIED' },
+          { x: 5, y: 3, type: 'one-way', direction: 'down', label: 'ONE-WAY SHAFT' }
+        ],
+        zones: [{ x: 9, y: 3, mode: 'ROTATED_RIGHT' }, { x: 1, y: 7, mode: 'ROTATED_LEFT' }]
+      },
+      {
+        id: 3, name: 'TIME & SPACE', subtitle: 'DELAYED NERVES & FOLDED DIMENSIONS',
+        map: [
+          '#############', '#S..#.......#', '#.#.#.#####.#', '#.#...#...#.#',
+          '#.#####.#.#.#', '#.#.....#...#', '#.#.#####.###', '#...#.......#',
+          '#####.#####.#', '#...#.#...#.#', '#.#.#.#.#.#.#', '#.#.....#.#E#',
+          '#############'
+        ],
+        start: { x: 1, y: 1 }, exit: { x: 11, y: 11 }, key: { x: 1, y: 11 }, requiresKey: true,
+        checkpoints: [{ x: 7, y: 7, name: 'RIFT CHAMBER' }],
+        traps: [
+          { x: 3, y: 1, type: 'delay', delay: 500, label: 'INPUT DELAY ENGAGED' },
+          { x: 7, y: 3, type: 'teleport', to: { x: 1, y: 5 }, label: 'WARPED BACK TO FOYER' },
+          { x: 11, y: 1, type: 'fake-exit', to: { x: 5, y: 9 }, label: 'DECOY EXIT COLLAPSED' },
+          { x: 3, y: 9, type: 'spike', label: 'DELAY TIMING HAZARD' },
+          { x: 9, y: 7, type: 'direction', mode: 'NORMAL', label: 'CONTROLS RESTORED' }
+        ],
+        zones: [{ x: 5, y: 1, mode: 'DELAYED' }],
+        movingWalls: [{ from: { x: 9, y: 9 }, to: { x: 9, y: 11 }, speed: 0.0009, pause: 600 }]
+      },
+      {
+        id: 4, name: 'THE PHANTOM CHAMBER', subtitle: 'PATROLLING SENTINELS & INVISIBLE TRIGGERS',
+        map: [
+          '#############', '#S....#.....#', '#.###.#.###.#', '#.#...#...#.#',
+          '#.#.#####.#.#', '#.#...#...#.#', '#.###.#.###.#', '#...#...#...#',
+          '###.#####.###', '#...#...#...#', '#.###.#.###.#', '#.....#...#E#',
+          '#############'
+        ],
+        start: { x: 1, y: 1 }, exit: { x: 11, y: 11 }, key: { x: 5, y: 5 }, requiresKey: true,
+        checkpoints: [{ x: 1, y: 7, name: 'SHADOW ALCOVE' }, { x: 9, y: 7, name: 'EAST PILLAR' }],
+        traps: [
+          { x: 3, y: 1, type: 'invisible-trigger', targetWall: { x: 5, y: 3 }, label: 'PRESSURE PLATE CLICKED' },
+          { x: 5, y: 1, type: 'direction', mode: 'MIRRORED', label: 'MIRRORED HORIZONTAL CONTROLS' },
+          { x: 7, y: 7, type: 'disappearing-floor', delay: 750, label: 'DISAPPEARING BRIDGE' },
+          { x: 3, y: 9, type: 'spike', label: 'PERIODIC SPIKES' },
+          { x: 1, y: 11, type: 'teleport', to: { x: 9, y: 1 }, label: 'DISORIENTATION RIFT' }
+        ],
+        zones: [{ x: 7, y: 1, mode: 'MIRRORED' }],
+        enemies: [
+          { path: [{ x: 1, y: 3 }, { x: 5, y: 3 }, { x: 5, y: 5 }, { x: 1, y: 5 }], speed: 0.0014, color: '#ff4f64' },
+          { path: [{ x: 7, y: 9 }, { x: 11, y: 9 }, { x: 11, y: 7 }, { x: 7, y: 7 }], speed: 0.0016, color: '#a98bff' }
+        ],
+        tempWalls: [{ x: 5, y: 3, period: 3200, initialOffset: 0 }]
+      },
+      {
+        id: 5, name: 'THE FINAL LABYRINTH', subtitle: 'ALL PATTERNS CONVERGE / ESCAPE THE PSYCHE',
+        map: [
+          '###############', '#S..#...#.....#', '#.#.#.#.#.###.#', '#.#...#...#...#',
+          '#.#####.###.#.#', '#...#...#...#.#', '###.#.###.###.#', '#...#...#.....#',
+          '#.#####.#.#####', '#.#.....#...#.#', '#.#.#######.#.#', '#.#.#.....#...#',
+          '#...#...#.#...#', '#####.###.#..E#', '###############'
+        ],
+        start: { x: 1, y: 1 }, exit: { x: 13, y: 13 }, key: { x: 7, y: 7 }, requiresKey: true,
+        checkpoints: [{ x: 7, y: 3, name: 'NORTH SANCTUARY' }, { x: 3, y: 9, name: 'WEST VAULT' }, { x: 7, y: 11, name: 'GATEWAY' }],
+        traps: [
+          { x: 3, y: 1, type: 'direction', mode: 'ROTATED_RIGHT', label: 'SECTOR 1: 90° CLOCKWISE' },
+          { x: 5, y: 3, type: 'spike', label: 'FALSE CORRIDOR SPIKE' },
+          { x: 9, y: 3, type: 'delay', delay: 450, label: 'INPUT LATENCY FIELD' },
+          { x: 13, y: 1, type: 'fake-exit', to: { x: 1, y: 7 }, label: 'DECOY TELEPORTED YOU DEEP' },
+          { x: 3, y: 7, type: 'falling', delay: 700, label: 'COLLAPSING CHASM' },
+          { x: 9, y: 7, type: 'one-way', direction: 'left', label: 'ONE-WAY VAULT SEAL' },
+          { x: 5, y: 9, type: 'fake-safe', label: 'CRUSHED UNDERNEATH' },
+          { x: 11, y: 9, type: 'direction', mode: 'REVERSED', label: 'SECTOR 4: INVERTED REALITY' },
+          { x: 2, y: 12, type: 'twist', twist: 'invert', label: 'INVERTED HEADING' }
+        ],
+        zones: [{ x: 3, y: 3, mode: 'ROTATED_RIGHT' }, { x: 11, y: 11, mode: 'REVERSED' }],
+        enemies: [
+          { path: [{ x: 5, y: 5 }, { x: 9, y: 5 }, { x: 9, y: 7 }, { x: 5, y: 7 }], speed: 0.0018, color: '#ff4f64' },
+          { path: [{ x: 1, y: 11 }, { x: 3, y: 11 }, { x: 3, y: 12 }, { x: 1, y: 12 }], speed: 0.002, color: '#70f4df' }
+        ],
+        movingWalls: [{ from: { x: 9, y: 11 }, to: { x: 9, y: 13 }, speed: 0.001, pause: 700 }]
+      }
+    ];
+
+    function getLevel(index, variation = 0) {
+      const base = LEVELS[index];
+      const level = JSON.parse(JSON.stringify(base));
+      level.width = level.map[0].length;
+      level.height = level.map.length;
+      return level;
+    }
+
+    class UI {
+      constructor(game) {
+        this.game = game;
+        this.levelValue = document.querySelector('#levelValue');
+        this.levelName = document.querySelector('#levelName');
+        this.keysValue = document.querySelector('#keysValue');
+        this.attemptsValue = document.querySelector('#attemptsValue');
+        this.pips = document.querySelector('#attemptPips')?.children || [];
+        this.checkpointValue = document.querySelector('#checkpointValue');
+        this.checkpointName = document.querySelector('#checkpointName');
+        this.statusText = document.querySelector('#statusText');
+        this.shell = document.querySelector('.playfield-wrap');
+
+        this.startPanel = document.querySelector('#startPanel');
+        this.pausePanel = document.querySelector('#pausePanel');
+        this.messagePanel = document.querySelector('#messagePanel');
+        this.messageKicker = document.querySelector('#messageKicker');
+        this.messageTitle = document.querySelector('#messageTitle');
+        this.messageBody = document.querySelector('#messageBody');
+        this.messageAction = document.querySelector('#messageAction');
+
+        document.querySelector('#startButton')?.addEventListener('click', () => this.game.start());
+        document.querySelector('#continueButton')?.addEventListener('click', () => this.game.togglePause(false));
+        document.querySelector('#restartButton')?.addEventListener('click', () => this.game.restartLevel());
+        document.querySelector('#pauseButton')?.addEventListener('click', () => this.game.togglePause());
+        this.messageAction?.addEventListener('click', () => this.game.messageAction());
+
+        document.querySelector('#soundButton')?.addEventListener('click', (e) => {
+          const enabled = this.game.audio.toggle();
+          e.currentTarget.textContent = enabled ? 'SOUND ON' : 'SOUND OFF';
+        });
+      }
+      sync(state) {
+        if (this.levelValue) this.levelValue.textContent = `${state.level} / 5`;
+        if (this.levelName) this.levelName.textContent = state.levelName || '';
+        if (this.keysValue) this.keysValue.textContent = state.keys ? '1' : '0';
+        if (this.attemptsValue) this.attemptsValue.textContent = state.attempts;
+        if (this.checkpointValue) this.checkpointValue.textContent = state.checkpointActive ? 'ACTIVE' : 'ORIGIN';
+        if (this.checkpointName) this.checkpointName.textContent = state.checkpointName || 'START';
+        if (this.statusText) this.statusText.textContent = state.status || 'SIGNAL STABLE';
+        if (this.pips) {
+          [...this.pips].forEach((pip, idx) => pip.classList.toggle('off', idx >= state.attempts));
+        }
+      }
+      hideStart() { if (this.startPanel) this.startPanel.hidden = true; }
+      pause(show) { if (this.pausePanel) this.pausePanel.hidden = !show; }
+      glitch() {
+        if (!this.shell) return;
+        this.shell.classList.remove('control-glitch');
+        void this.shell.offsetWidth;
+        this.shell.classList.add('control-glitch');
+        setTimeout(() => this.shell.classList.remove('control-glitch'), 450);
+      }
+      shake() {
+        if (!this.shell) return;
+        this.shell.classList.remove('shake');
+        void this.shell.offsetWidth;
+        this.shell.classList.add('shake');
+        setTimeout(() => this.shell.classList.remove('shake'), 400);
+      }
+      message(kicker, title, body, actionText) {
+        if (this.messageKicker) this.messageKicker.textContent = kicker;
+        if (this.messageTitle) this.messageTitle.textContent = title;
+        if (this.messageBody) this.messageBody.textContent = body;
+        if (this.messageAction) this.messageAction.textContent = `${actionText} ↵`;
+        if (this.messagePanel) this.messagePanel.hidden = false;
+      }
+      hideMessage() { if (this.messagePanel) this.messagePanel.hidden = true; }
+    }
+
+    class Game {
+      constructor(canvas) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.tileSize = 48;
+        this.audio = new AudioManager();
+        this.controls = new ControlManager((mode) => this.notifyControlChange(mode));
+        this.player = new Player({ x: 1, y: 1 });
+        this.traps = new TrapManager(this);
+        this.ui = new UI(this);
+        this.levelIndex = 0;
+        this.maxAttempts = 3;
+        this.attempts = this.maxAttempts;
+        this.levelVariation = 0;
+        this.running = false;
+        this.paused = false;
+        this.lastTime = 0;
+        this.status = 'SIGNAL STABLE';
+        this.oneWay = null;
+        this.finished = false;
+        this.bindInput();
+        this.loadLevel(0);
+      }
+      bindInput() {
+        window.addEventListener('keydown', (event) => {
+          const arrowMap = {
+            ArrowUp: 'ArrowUp', ArrowDown: 'ArrowDown', ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight',
+            w: 'ArrowUp', W: 'ArrowUp', s: 'ArrowDown', S: 'ArrowDown',
+            a: 'ArrowLeft', A: 'ArrowLeft', d: 'ArrowRight', D: 'ArrowRight'
+          };
+          const mappedKey = arrowMap[event.key];
+          if (mappedKey) {
+            event.preventDefault();
+            this.input(mappedKey);
+            return;
+          }
+          if (event.key === 'Enter') {
+            if (!this.running && !this.ui.messagePanel.hidden) { event.preventDefault(); this.messageAction(); }
+            else if (!this.running && !this.ui.startPanel.hidden) { event.preventDefault(); this.start(); }
+            else if (this.paused) { event.preventDefault(); this.togglePause(false); }
+          }
+          if (event.key === 'Escape' || event.key === 'p' || event.key === 'P') {
+            if (this.running) { event.preventDefault(); this.togglePause(); }
+          }
+        });
+      }
+      loadLevel(index) {
+        this.levelIndex = index;
+        this.level = getLevel(index, this.levelVariation);
+        this.player.reset(this.level.start);
+        this.traps.load(this.level);
+        this.controls.resetControls();
+        this.oneWay = null;
+        this.status = `${this.level.name}: SIGNAL STABLE`;
+        this.canvas.width = this.level.width * this.tileSize;
+        this.canvas.height = this.level.height * this.tileSize;
+        this.ui.sync(this.state());
+        this.draw();
+      }
+      state() {
+        const isAtStart = this.player.checkpoint.x === this.level.start.x && this.player.checkpoint.y === this.level.start.y;
+        const cpObj = this.level.checkpoints.find(cp => cp.x === this.player.checkpoint.x && cp.y === this.player.checkpoint.y);
+        return {
+          level: this.levelIndex + 1,
+          levelName: this.level.name,
+          keys: this.player.hasKey,
+          attempts: this.attempts,
+          checkpointActive: !isAtStart,
+          checkpointName: isAtStart ? 'ORIGIN' : (cpObj?.name || 'ACTIVE'),
+          status: this.status
+        };
+      }
+      start() {
+        this.audio.unlock();
+        this.running = true;
+        this.paused = false;
+        this.ui.hideStart();
+        this.ui.hideMessage();
+        this.lastTime = performance.now();
+        requestAnimationFrame((time) => this.loop(time));
+      }
+      loop(time) {
+        if (!this.running) return;
+        const delta = Math.min(50, time - this.lastTime);
+        this.lastTime = time;
+        if (!this.paused) {
+          this.update(delta, time);
+          this.draw();
+        }
+        requestAnimationFrame((next) => this.loop(next));
+      }
+      update(delta, now) {
+        this.player.update(delta);
+        this.traps.update(delta);
+        const readyInputs = this.controls.drain(now);
+        for (const item of readyInputs) this.attemptMove(item.direction);
+        if (!this.player.moving) this.checkTile();
+      }
+      input(rawKey) {
+        if (!this.running || this.paused || this.player.isDying) return;
+        const result = this.controls.resolve(rawKey);
+        if (!result) return;
+        if (result.queued) {
+          this.status = 'INPUT DELAYED (PENDING BUFFER)';
+          this.ui.sync(this.state());
+        } else {
+          this.attemptMove(result.direction);
+        }
+      }
+      attemptMove(direction) {
+        if (this.player.moving || this.player.isDying) return;
+        if (this.oneWay && direction !== this.oneWay) {
+          this.status = `BLOCKED: ONE-WAY GATE (${this.oneWay.toUpperCase()} ONLY)`;
+          this.ui.sync(this.state());
+          this.audio.tone(75, 0.04, 'sawtooth', 0.02);
+          return;
+        }
+        const finalDirection = this.controls.applyTwist(direction, this.player.twist);
+        this.player.twist = 'none';
+        const [dx, dy] = directionVector(finalDirection);
+        const targetX = this.player.tile.x + dx;
+        const targetY = this.player.tile.y + dy;
+
+        if (!canWalk(this.level, targetX, targetY)) {
+          this.audio.tone(80, 0.03, 'square', 0.015);
+          return;
+        }
+        if (this.traps.isWall(targetX, targetY)) {
+          this.status = 'BLOCKED BY SHIFTING WALL';
+          this.audio.tone(90, 0.04, 'sawtooth', 0.02);
+          this.ui.sync(this.state());
+          return;
+        }
+
+        this.player.moveTo(targetX, targetY, finalDirection);
+        this.audio.movement();
+
+        const currentTrap = this.traps.trapAt(targetX, targetY);
+        if (!currentTrap || currentTrap.type !== 'one-way') this.oneWay = null;
+      }
+      checkTile() {
+        const { x, y } = this.player.tile;
+        this.traps.handleTile(x, y);
+
+        if (this.level.key && x === this.level.key.x && y === this.level.key.y && !this.player.hasKey) {
+          this.player.hasKey = true;
+          this.audio.key();
+          this.ui.glitch();
+          this.status = 'KEY ACQUIRED // SYSTEM DESTABILIZED';
+          this.onKeyCollected();
+        }
+
+        if (x === this.level.exit.x && y === this.level.exit.y) {
+          if (!this.level.requiresKey || this.player.hasKey) this.completeLevel();
+          else {
+            this.status = 'EXIT SEALED: KEY REQUIRED';
+            this.ui.sync(this.state());
+          }
+        }
+        this.ui.sync(this.state());
+      }
+      onKeyCollected() {
+        switch (this.levelIndex) {
+          case 0:
+            this.controls.setReversedControls();
+            this.notifyControlChange('KEY CHANGED REALITY: CONTROLS REVERSED');
+            break;
+          case 1:
+            this.controls.setRotatedControls('right');
+            this.notifyControlChange('ROTATION ENGAGED');
+            break;
+          case 2:
+            this.controls.setDelayedControls(500);
+            this.notifyControlChange('LATENCY DETECTED (500ms)');
+            break;
+          case 3:
+            this.controls.setMirroredControls('horizontal');
+            this.notifyControlChange('MIRRORED CONTROLS ACTIVE');
+            break;
+          case 4:
+            this.controls.setRandomControls(3);
+            this.notifyControlChange('SYSTEM INSTABILITY: CONTROLS MUTATED');
+            break;
+        }
+      }
+      activateCheckpoint(point) {
+        if (this.player.checkpoint.x === point.x && this.player.checkpoint.y === point.y) return;
+        this.player.setCheckpoint(point);
+        this.audio.checkpoint();
+        this.status = `CHECKPOINT ACTIVE: ${point.name || 'SAFE ZONE'}`;
+        this.ui.sync(this.state());
+      }
+      changeControls(mode, seed = 1) {
+        if (mode === 'NORMAL') this.controls.setNormalControls();
+        else if (mode === 'REVERSED') this.controls.setReversedControls();
+        else if (mode === 'ROTATED_LEFT') this.controls.setRotatedControls('left');
+        else if (mode === 'ROTATED_RIGHT') this.controls.setRotatedControls('right');
+        else if (mode === 'MIRRORED') this.controls.setMirroredControls('horizontal');
+        else if (mode === 'RANDOMIZED') this.controls.setRandomControls(seed);
+        else if (mode === 'DELAYED') this.controls.setDelayedControls(500);
+      }
+      notifyControlChange(message) {
+        this.status = `CONTROLS: ${message}`;
+        this.audio.control();
+        this.ui.glitch();
+        this.ui.sync(this.state());
+      }
+      teleport(destination) {
+        this.player.x = destination.x;
+        this.player.y = destination.y;
+        this.player.targetX = destination.x;
+        this.player.targetY = destination.y;
+        this.player.moving = false;
+        this.status = 'THE MAZE FOLDED SPACE';
+        this.ui.shake();
+        this.ui.glitch();
+        this.audio.control();
+      }
+      damage(reason) {
+        if (this.player.invulnerable || this.player.isDying) return;
+        this.player.invulnerable = true;
+        this.player.isDying = true;
+        this.audio.trap();
+        this.ui.shake();
+        this.attempts -= 1;
+        this.status = reason || 'LETHAL TRAP ACTIVATED';
+        this.ui.sync(this.state());
+        setTimeout(() => {
+          if (this.attempts <= 0) {
+            this.gameOver();
+          } else {
+            this.player.respawn();
+            this.status = 'RESPAWNED AT LAST CHECKPOINT';
+            this.ui.sync(this.state());
+          }
+        }, 450);
+      }
+      completeLevel() {
+        this.running = false;
+        this.audio.complete();
+        if (this.levelIndex === 4) {
+          this.finished = true;
+          this.ui.message('ESCAPE CONFIRMED', 'YOU BEAT THE PATTERN.', 'The maze was never truly random. You decoded the hidden psychological trap.', 'PLAY AGAIN');
+        } else {
+          this.finished = false;
+          this.ui.message(`LEVEL ${this.levelIndex + 1} CLEARED`, 'THE MAZE BLINKED.', 'You deduced this chamber’s secret rule. The next room will challenge you further.', 'NEXT LEVEL');
+        }
+      }
+      gameOver() {
+        this.running = false;
+        this.finished = true;
+        this.audio.gameOver();
+        this.ui.message('ATTEMPTS EXHAUSTED', 'THE MAZE WON.', 'Your keys deceived you. The maze learned your decisions before you made them.', 'TRY AGAIN');
+      }
+      messageAction() {
+        this.ui.hideMessage();
+        if (this.finished) {
+          this.levelIndex = 0;
+          this.levelVariation = 0;
+          this.attempts = this.maxAttempts;
+          this.loadLevel(0);
+          this.start();
+        } else {
+          this.levelIndex += 1;
+          this.attempts = this.maxAttempts;
+          this.loadLevel(this.levelIndex);
+          this.start();
+        }
+      }
+      restartLevel() {
+        this.attempts = this.maxAttempts;
+        this.levelVariation += 1;
+        this.loadLevel(this.levelIndex);
+        this.ui.hideMessage();
+        this.audio.unlock();
+        if (!this.running) {
+          this.running = true;
+          this.paused = false;
+          this.lastTime = performance.now();
+          requestAnimationFrame((time) => this.loop(time));
+        }
+      }
+      togglePause(force) {
+        if (!this.running && force !== false) return;
+        this.paused = force === undefined ? !this.paused : force;
+        this.ui.pause(this.paused);
+      }
+      draw() {
+        const size = this.tileSize;
+        const ctx = this.ctx;
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = '#080c14';
+        ctx.fillRect(0, 0, w, h);
+
+        for (let y = 0; y < this.level.height; y++) {
+          for (let x = 0; x < this.level.width; x++) {
+            this.drawTile(x, y, this.level.map[y][x] === '#');
+          }
+        }
+        for (const cp of this.level.checkpoints) this.drawCheckpoint(cp);
+        this.drawExit();
+        if (!this.player.hasKey && this.level.key) this.drawKey();
+        this.traps.draw(ctx, size);
+        this.drawAtmosphere();
+        this.player.draw(ctx, size);
+      }
+      drawTile(x, y, isWall) {
+        const ctx = this.ctx;
+        const size = this.tileSize;
+        const px = x * size;
+        const py = y * size;
+        if (isWall) {
+          ctx.fillStyle = '#101721';
+          ctx.fillRect(px, py, size, size);
+          ctx.fillStyle = '#223040';
+          ctx.fillRect(px, py, size, 3);
+          ctx.fillRect(px, py, 3, size);
+          ctx.fillStyle = '#070b10';
+          ctx.fillRect(px, py + size - 3, size, 3);
+          ctx.fillRect(px + size - 3, py, 3, size);
+          ctx.strokeStyle = '#182433';
+          ctx.strokeRect(px + 4.5, py + 4.5, size - 9, size - 9);
+        } else {
+          ctx.fillStyle = (x + y) % 2 === 0 ? '#090e16' : '#070b11';
+          ctx.fillRect(px, py, size, size);
+          ctx.strokeStyle = 'rgba(29, 44, 59, 0.45)';
+          ctx.strokeRect(px + 0.5, py + 0.5, size - 1, size - 1);
+        }
+      }
+      drawExit() {
+        const ctx = this.ctx;
+        const s = this.tileSize;
+        const exit = this.level.exit;
+        const ex = exit.x * s + s / 2;
+        const ey = exit.y * s + s / 2;
+        const time = performance.now();
+        const pulse = Math.sin(time * 0.004) * 5 + 32;
+        const aura = ctx.createRadialGradient(ex, ey, 2, ex, ey, pulse);
+        aura.addColorStop(0, 'rgba(169, 139, 255, 0.75)');
+        aura.addColorStop(0.5, 'rgba(169, 139, 255, 0.25)');
+        aura.addColorStop(1, 'rgba(169, 139, 255, 0)');
+        ctx.fillStyle = aura;
+        ctx.beginPath();
+        ctx.arc(ex, ey, pulse, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#a98bff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(exit.x * s + 8, exit.y * s + 8, s - 16, s - 16);
+        ctx.fillStyle = '#a98bff';
+        ctx.font = '700 9px Consolas, monospace';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(this.player.hasKey || !this.level.requiresKey ? 'EXIT' : 'LOCK', ex, ey);
+      }
+      drawKey() {
+        const ctx = this.ctx;
+        const s = this.tileSize;
+        const key = this.level.key;
+        const kx = key.x * s + s / 2;
+        const time = performance.now();
+        const bob = Math.sin(time * 0.005) * 3;
+        const ky = key.y * s + s / 2 + bob;
+        const aura = ctx.createRadialGradient(kx, ky, 1, kx, ky, 24);
+        aura.addColorStop(0, 'rgba(248, 184, 94, 0.7)');
+        aura.addColorStop(0.5, 'rgba(248, 184, 94, 0.2)');
+        aura.addColorStop(1, 'rgba(248, 184, 94, 0)');
+        ctx.fillStyle = aura;
+        ctx.beginPath();
+        ctx.arc(kx, ky, 24, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#f8b85e';
+        ctx.beginPath();
+        ctx.arc(kx - 4, ky, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#0a0f16';
+        ctx.beginPath();
+        ctx.arc(kx - 4, ky, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#f8b85e';
+        ctx.fillRect(kx, ky - 2, 10, 4);
+        ctx.fillRect(kx + 5, ky + 2, 3, 4);
+        ctx.fillRect(kx + 9, ky + 2, 3, 3);
+      }
+      drawCheckpoint(cp) {
+        const ctx = this.ctx;
+        const s = this.tileSize;
+        const cx = cp.x * s + s / 2;
+        const cy = cp.y * s + s / 2;
+        const isActive = this.player.checkpoint.x === cp.x && this.player.checkpoint.y === cp.y;
+        ctx.save();
+        ctx.strokeStyle = isActive ? '#70f4df' : 'rgba(112, 244, 223, 0.35)';
+        ctx.lineWidth = isActive ? 2 : 1;
+        ctx.strokeRect(cp.x * s + 12, cp.y * s + 12, s - 24, s - 24);
+        if (isActive) {
+          ctx.fillStyle = 'rgba(112, 244, 223, 0.18)';
+          ctx.fillRect(cp.x * s + 12, cp.y * s + 12, s - 24, s - 24);
+        }
+        ctx.fillStyle = isActive ? '#70f4df' : 'rgba(112, 244, 223, 0.5)';
+        ctx.beginPath();
+        ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+      drawAtmosphere() {
+        const ctx = this.ctx;
+        const s = this.tileSize;
+        const px = this.player.x * s + s / 2;
+        const py = this.player.y * s + s / 2;
+        const visionRadius = s * 4.8;
+        ctx.save();
+        const vignette = ctx.createRadialGradient(px, py, s * 1.5, px, py, visionRadius);
+        vignette.addColorStop(0, 'rgba(4, 7, 12, 0)');
+        vignette.addColorStop(0.55, 'rgba(4, 7, 12, 0.35)');
+        vignette.addColorStop(0.85, 'rgba(4, 7, 12, 0.7)');
+        vignette.addColorStop(1, 'rgba(4, 7, 12, 0.9)');
+        ctx.fillStyle = vignette;
+        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.restore();
+      }
+    }
+
+    const canvas = document.querySelector('#gameCanvas');
+    const game = new Game(canvas);
+    window.unpredictable = game;
+  </script>
+</body>
+</html>
