@@ -324,14 +324,14 @@ unpredictable-game/
 
 Add screenshots to a `screenshots/` folder and update these links before submission:
 
-![Start screen](screenshots/start-screen.png "UNPREDICTABLE start screen")
+![Start screen](screenshots/startscreen.png")
 *The start screen introduces the psychological escape trial.*
 
-![Gameplay](screenshots/gameplay.png "UNPREDICTABLE gameplay")
+![Gameplay](screenshots/gameplay.png")
 *Gameplay view showing the maze, player, key, exit, and HUD.*
 
-![Control trap](screenshots/control-trap.png "Control mutation gameplay")
-*A control mutation or trap state challenging the player's movement pattern.*
+![End Screen](screenshots/endscreen.png")
+*A screen which pops up on clearing a level.*
 
 ## Diagrams
 
